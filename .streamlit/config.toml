@@ -1,7 +1,14 @@
-[client]
+[server]
+headless = true
+enableCORS = false
+runOnSave = true
 
+[client]
 showSidebarNavigation = false
 
-[server]
-runOnSave = true
-headless = true
+[theme]
+primaryColor = "#4CAF50"
+backgroundColor = "#F9F9F9"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#333333"
+font = "sans serif"

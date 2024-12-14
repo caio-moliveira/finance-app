@@ -1,0 +1,10 @@
+credentials:
+  usernames:
+    caiomo:
+      email: "caio.oliveira@qualityeng.com.br"
+      name: "caiomo"
+      password: "abcd1234"
+cookie:
+  name: "streamlit_auth_cookie"
+  key: "new_unique_secret_key"  # Change this to a new unique value
+  expiry_days: 30

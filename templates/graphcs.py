@@ -1,143 +1,142 @@
-from utils import dataframe_helpers
+import pandas as pd
 import plotly.graph_objects as go
-from controller.config import ENTRADA, SAIDA
 import plotly.express as px
 import streamlit as st
-import pandas as pd
+from utils import dataframe_helpers
+from controller.config import ENTRADA, SAIDA
 
 ENTRADA = "Entrada"
 SAIDA = "Saida"
 
-def entries_by_categories_dashboard(df):
-    """Entradas por categorias"""
-    
-    with st.container(border=True):
-        # Gráfico de entradas por categoria
-        fig_entradas = px.bar(df[df['tipo'] == ENTRADA], x='categoria', y='valor', title='Entradas por categoria',
-                        labels={'valor': 'valor (R$)'}, color='categoria',
-                        color_discrete_sequence=px.colors.qualitative.Pastel)
-        st.plotly_chart(fig_entradas)
 
+def monthly_spending_trends(df):
+    """Monthly Spending Trends by Category"""
+    time_filter = st.selectbox("Timeframe", ["Monthly", "Weekly", "Daily"])
 
-def monthly_evolution_dashboard(df):
-    """Evolução mensal"""
+    if time_filter == "Monthly":
+        df['month'] = pd.to_datetime(df['lancamento']).dt.to_period('M').astype(str)
+        df['day'] = pd.to_datetime(df['lancamento']).dt.day  # Extract days
+        grouped_df = df[df['tipo'] == SAIDA].groupby(['month', 'day', 'categoria'])['valor'].sum().reset_index()
 
-    if dataframe_helpers.check_empty_df(df):
-        st.toast("Sem metrica para analisar", icon="📓")
-        return
-
-    with st.container(border=True):
-        # Agrupando os dados para o gráfico de evolução mensal
-        df_entradas = df[df['tipo'] == ENTRADA].groupby('lancamento').sum().reset_index()
-        df_saidas = df[df['tipo'] == SAIDA].groupby('lancamento').sum().reset_index()
-        df_entradas['Saldo Acumulado'] = df_entradas['valor'].cumsum() - df_saidas['valor'].cumsum()
-        fig = go.Figure()
-
-        # Adicionando barras para Entradas
-        fig.add_trace(go.Bar(
-            x=df_entradas['lancamento'],
-            y=df_entradas['valor'],
-            name=ENTRADA,
-            marker_color='rgb(55, 83, 109)'
-        ))
-
-        # Adicionando barras para saidas
-        fig.add_trace(go.Bar(
-            x=df_saidas['lancamento'],
-            y=df_saidas['valor'],
-            name=SAIDA,
-            marker_color='rgb(26, 118, 255)'
-        ))
-
-        # Adicionando linha para Saldo Acumulado
-        fig.add_trace(go.Scatter(
-            x=df_entradas['lancamento'],
-            y=df_entradas['Saldo Acumulado'],
-            mode='lines+markers',
-            name='Saldo Acumulado',
-            line=dict(color='rgb(255, 153, 51)', width=4, dash='dot')
-        ))
-
-        # Atualizando layout do gráfico
-        fig.update_layout(
-            title='Evolução Mensal de Entradas vs saidas',
-            xaxis_tickfont_size=14,
-            yaxis=dict(
-                title='valor (R$)',
-                titlefont_size=16,
-                tickfont_size=14,
-            ),
-            legend=dict(
-                x=0,
-                y=1.0,
-                bgcolor='rgba(255, 255, 255, 0)',
-                bordercolor='rgba(255, 255, 255, 0)'
-            ),
-            barmode='group',
-            bargap=0.15,
-            bargroupgap=0.1
+        fig = px.line(
+            grouped_df,
+            x='day',
+            y='valor',
+            color='categoria',
+            title='Spending Trends Over Days in the Month',
+            labels={'valor': 'Amount (R$)', 'day': 'Day of the Month', 'categoria': 'Category'}
         )
 
-        st.plotly_chart(fig)
+    elif time_filter == "Weekly":
+        df['week'] = pd.to_datetime(df['lancamento']).dt.to_period('W').astype(str)
+        df['day_name'] = pd.to_datetime(df['lancamento']).dt.day_name()  # Extract day names
+        grouped_df = df[df['tipo'] == SAIDA].groupby(['day_name', 'categoria'])['valor'].sum().reset_index()
 
+        # Order days of the week for better visualization
+        day_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        grouped_df['day_name'] = pd.Categorical(grouped_df['day_name'], categories=day_order, ordered=True)
 
-def expenses_by_categories_dashboard(df):
-    """saidas por categoria"""
+        fig = px.bar(
+            grouped_df,
+            x='day_name',
+            y='valor',
+            color='categoria',
+            title='Spending Trends Over Days in the Week',
+            labels={'valor': 'Amount (R$)', 'day_name': 'Day of the Week', 'categoria': 'Category'},
+            barmode='stack'  # Stacked bars
+        )
 
-    if dataframe_helpers.check_empty_df(df):
-        st.toast("Sem metrica para analisar", icon="📓")
-        return
-    
-    with st.container(border=True):
-        # Gráfico de saidas por categoria
-        fig_saidas = px.pie(df[df['tipo'] == SAIDA], names='categoria', values='valor', title='saidas por categoria',
-                        color_discrete_sequence=px.colors.qualitative.Pastel)
-        fig_saidas.update_traces(textinfo='percent+label')
-        st.plotly_chart(fig_saidas)
+    elif time_filter == "Daily":
+        today = pd.Timestamp.now().date()
+        df['date'] = pd.to_datetime(df['lancamento']).dt.date
+        daily_data = df[(df['tipo'] == SAIDA) & (df['date'] == today)].groupby(['categoria'])['valor'].sum().reset_index()
 
-
-def indicador():
-
-    fig = go.Figure(go.Indicator(
-        mode = "gauge+number",
-        value = 270,
-        title = {'text': "Progresso"},
-        gauge = {
-            'axis': {'range': [0, 500]},
-            'bar': {'color': "darkblue"},
-            'steps': [
-                {'range': [0, 250], 'color': "lightgray"},
-                {'range': [250, 400], 'color': "gray"}
-            ],
-            'threshold': {
-                'line': {'color': "red", 'width': 4},
-                'thickness': 0.75,
-                'value': 490
-            }
-        }
-    ))
+        fig = px.bar(
+            daily_data,
+            x='categoria',
+            y='valor',
+            title=f'Spending Trends for Today ({today})',
+            labels={'valor': 'Amount (R$)', 'categoria': 'Category'}
+        )
 
     st.plotly_chart(fig)
-    
 
-# Função para criar o gráfico de saldo por conta
-def balance_on_account(df: pd.DataFrame):
-    
-    # Função para ajustar o saldo com base no tipo de transação
-    def calculate_balance(df):
-        df['valor_ajustado'] = df.apply(lambda row: -row['valor'] if row['tipo'] == 'Saida' else row['valor'], axis=1)
-        
-        # Agrupando por conta e somando o saldo ajustado
-        df_group = df.groupby('conta').agg(saldo=('valor_ajustado', 'sum')).reset_index()
-        
-        return df_group
-    
-    df_group = calculate_balance(df)
-    
-    with st.container(border=True):
-        # Criar o gráfico de barras com Plotly
-        fig = px.bar(df_group, x='conta', y='saldo', labels={'conta': 'Conta', 'saldo': 'Saldo (R$)'}, 
-                    title='Saldo por Conta', color='conta', text_auto=True)
 
-        # Exibir o gráfico no Streamlit
-        st.plotly_chart(fig)
+def spending_by_category_bar_chart(df):
+    """Spending by Category with Time Filter"""
+    st.subheader("Spending by Category")
+
+    # Ensure 'lancamento' is in datetime format
+    df['lancamento'] = pd.to_datetime(df['lancamento'], errors='coerce')
+
+    last_7_days = st.checkbox("Show Last 7 Days Only")
+    if last_7_days:
+        # Filter data for the last 7 days
+        df = df[df['lancamento'] >= (pd.Timestamp.now() - pd.Timedelta(days=7))]
+
+    # Create the bar chart
+    fig = px.bar(
+        df[df['tipo'] == SAIDA],
+        x='categoria',
+        y='valor',
+        title='Spending by Category',
+        labels={'categoria': 'Category', 'valor': 'Amount (R$)'},
+        color='categoria'
+    )
+    st.plotly_chart(fig)
+
+
+
+def recurring_transactions_dashboard(df):
+    """Highlight Recurring Transactions"""
+    recurring = df.groupby(['descricao']).filter(lambda x: len(x) > 1)
+    
+    with st.container():
+        st.subheader("Recurring Transactions")
+        st.dataframe(recurring)
+
+
+def budget_vs_actual_dashboard(df, budget):
+    """Budget vs Actual"""
+    # Group by 'tipo' and sum only the 'valor' column
+    df_grouped = df.groupby('tipo')['valor'].sum().reset_index()
+
+    # Get actual spending
+    actual = df_grouped.loc[df_grouped['tipo'] == SAIDA, 'valor'].values[0] if SAIDA in df_grouped['tipo'].values else 0
+
+    # Create a bar chart for Budget vs Actual
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=['Budget', 'Actual'],
+        y=[budget, actual],
+        name='Spending',
+        marker_color=['green', 'blue']
+    ))
+
+    fig.update_layout(
+        title='Budget vs Actual',
+        yaxis_title='Amount (R$)',
+        barmode='group'
+    )
+
+    st.plotly_chart(fig)
+
+
+def transaction_table_with_filters(df):
+    """Transaction Table with Filters"""
+    with st.container():
+        st.subheader("Transaction Details")
+        category = st.selectbox("Filter by Category", options=["All"] + df['categoria'].unique().tolist())
+        account = st.selectbox("Filter by Account", options=["All"] + df['conta'].unique().tolist())
+        
+        filtered_df = df
+        if category != "All":
+            filtered_df = filtered_df[filtered_df['categoria'] == category]
+        if account != "All":
+            filtered_df = filtered_df[filtered_df['conta'] == account]
+        
+        st.dataframe(filtered_df)
+
+
+
+

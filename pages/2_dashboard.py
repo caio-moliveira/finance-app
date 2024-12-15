@@ -1,6 +1,12 @@
 from templates.sidebar import menu
 from templates.metrics import dashboard_metric
-from templates.graphcs import entries_by_categories_dashboard, monthly_evolution_dashboard, expenses_by_categories_dashboard, balance_on_account
+from templates.graphcs import (
+    spending_by_category_bar_chart,
+    monthly_spending_trends,
+    recurring_transactions_dashboard,
+    budget_vs_actual_dashboard,
+    transaction_table_with_filters
+)
 from utils.dataframe_helpers import check_empty_df
 from controller.loader import load_transactions_by_year_and_selected_months
 import streamlit as st
@@ -14,33 +20,39 @@ def main():
         st.session_state["meses_selected"]
     )
 
-    # Sem dados para gerar gráficos
+    # Check if the DataFrame is empty
     if check_empty_df(df):
-        st.toast("Sem dados para gerar os gráficos", icon="🚨")
+        st.toast("No data available to generate graphs", icon="🚨")
         st.stop()
 
-    # Mostrando gráficos e metricas
-    dashboard_metric(df)
+    # Sidebar inputs for user goals
+    savings_goal = st.sidebar.number_input("Savings Goal (R$)", min_value=0, value=10000)
+    monthly_budget = st.sidebar.number_input("Monthly Budget (R$)", min_value=0, value=5000)
 
-    # Graficos categoria
-    coluna_1, coluna_2 = st.columns(2)
+    # Metrics at the top of the dashboard
+    dashboard_metric(df, monthly_budget, savings_goal)
 
-    with coluna_1:
-        # Entrada por categoria
-        entries_by_categories_dashboard(df)
+    # Render primary graphs
+    spending_by_category_bar_chart(df)
+    monthly_spending_trends(df)
 
-        # Evolução mensal
-        monthly_evolution_dashboard(df)
+    # Tabs for additional insights
+    st.divider()
+    tab1, tab2, tab3 = st.tabs([
+        "Recurring Transactions", "Budget vs Actual", "Transaction Table"
+    ])
 
-    with coluna_2:
-        # Despesas por categoria
-        expenses_by_categories_dashboard(df)
+    with tab1:
+        recurring_transactions_dashboard(df)
 
-        # Saldo por conta
-        balance_on_account(df)
+    with tab2:
+        budget_vs_actual_dashboard(df, monthly_budget)
+
+    with tab3:
+        transaction_table_with_filters(df)
+
 
 if __name__ == "__main__":
-    # Configurações da página
-    st.set_page_config("Gráficos", "📊", "wide")
+    st.set_page_config(page_title="Financial Dashboard", page_icon="📊", layout="wide")
     menu()
     main()

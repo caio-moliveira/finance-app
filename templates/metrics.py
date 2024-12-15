@@ -1,19 +1,53 @@
 import streamlit as st
-from handlers import calculations
 
+def dashboard_metric(df, monthly_budget, savings_goal):
+    """Metrics for Dashboard"""
+    # Calculate metrics
+    entradas = df[df['tipo'] == "Entrada"]['valor'].sum()
+    saidas = df[df['tipo'] == "Saida"]['valor'].sum()
+    savings = entradas - saidas
+    remaining_budget = max(monthly_budget - saidas, 0)
+    over_budget = saidas > monthly_budget
 
-def dashboard_metric(df):
-    """Metricas"""
-    entradas, saidas, saldo = calculations.dashboard_metrics(df)
+    # Calculate savings progress
+    savings_progress = min((savings / savings_goal) * 100, 100) if savings_goal > 0 else 0
+    savings_status = "Achieved" if savings >= savings_goal else "In Progress"
 
-    # Metricas
-    col_entradas, col_despesas, col_saldo = st.columns(3)
+    # Display metrics
+    st.markdown("### 📊 Financial Overview")
+    col_entradas, col_saidas, col_savings, col_budget_status = st.columns(4)
 
-    with col_entradas.container(border=True):
-        st.metric("Entradas", str(entradas))
+    with col_entradas:
+        st.metric(label="💰 Entradas", value=f"R$ {entradas:,.2f}")
 
-    with col_despesas.container(border=True):
-        st.metric("Saidas", str(saidas))
-        
-    with col_saldo.container(border=True):
-        st.metric("Saldo", str(saldo))
+    with col_saidas:
+        st.metric(label="📉 Saídas", value=f"R$ {saidas:,.2f}")
+
+    with col_savings:
+        st.metric(
+            label="💾 Savings So Far",
+            value=f"R$ {savings:,.2f}",
+            delta=f"{savings_progress:.2f}% of Goal",
+            delta_color="normal" if savings < savings_goal else "off"
+        )
+
+    with col_budget_status:
+        if over_budget:
+            st.metric(
+                label="⚠️ Budget Status",
+                value="Over Budget",
+                delta=f"-R$ {saidas - monthly_budget:,.2f}",
+                delta_color="inverse"
+            )
+        else:
+            st.metric(
+                label="✔️ Budget Status",
+                value="Under Budget",
+                delta=f"+R$ {remaining_budget:,.2f}",
+                delta_color="normal"
+            )
+
+    # Additional savings goal section
+    st.markdown("### 🏦 Savings Goal Progress")
+    st.progress(savings_progress / 100)
+    st.write(f"**Savings Goal:** R$ {savings_goal:,.2f} ({savings_status})")
